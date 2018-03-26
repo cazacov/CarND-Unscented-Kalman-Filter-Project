@@ -25,10 +25,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 10;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 1;
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -46,14 +46,17 @@ UKF::UKF() {
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
   //DO NOT MODIFY measurement noise values above these are provided by the sensor manufacturer.
-  
-  /**
-  TODO:
 
-  Complete the initialization. See ukf.h for other member properties.
+  // State dimension
+  n_x_ = 5;
 
-  Hint: one or more values initialized above might be wildly off...
-  */
+  // Augmented state dimension
+  n_aug_ = 2 * n_x_ + 1;
+
+  // Sigma point spreading parameter
+  lambda_ = 3.0 - n_x_;
+
+  is_initialized_ = false;
 }
 
 UKF::~UKF() {}
@@ -63,12 +66,68 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
+
+
+  if (!is_initialized_){
+    Initialize(meas_package);
+    is_initialized_ = true;
+  }
+
   /**
   TODO:
 
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
+}
+
+void UKF::Initialize(MeasurementPackage &meas_package)
+{
+  time_us_ = meas_package.timestamp_;
+
+  double x = 0;
+  double y = 0;
+
+  switch (meas_package.sensor_type_)
+  {
+    case MeasurementPackage::LASER:
+      x = meas_package.raw_measurements_[0]; // X
+      y = meas_package.raw_measurements_[1]; // Y
+      break;
+    case MeasurementPackage::RADAR:
+      {
+        double rho = meas_package.raw_measurements_[0];
+        double theta = meas_package.raw_measurements_[1];
+        x = rho * cos(theta);
+        y = rho * sin(theta);
+      }
+      break;
+    default:
+      throw std::invalid_argument("Unsupported sensor type");
+  }
+
+  //  Initialize state vector
+  x_ = VectorXd(n_x_);
+  x_ << x, y, 0, 0, 0;
+
+  // state covariance matrix
+  P_ = MatrixXd(n_x_, n_x_);
+  P_ << 1,  0,  0,  0,  0,
+        0,  1,  0,  0,  0,
+        0,  0,  std_a_ * std_a_, 0, 0,
+        0,  0,  0,  M_PI * M_PI, 0,
+        0,  0,  0,  0,  std_yawdd_ * std_yawdd_;
+
+  // measurement covariance matrix - laser
+  R_laser_ = MatrixXd(2,2);
+  R_laser_ << std_laspx_ * std_laspx_, 0,
+              0, std_laspy_ * std_laspy_;
+
+  //measurement covariance matrix - radar
+  R_radar_ << std_radr_ * std_radr_, 0, 0,
+          0, std_radphi_ * std_radphi_, 0,
+          0, 0, std_radrd_ * std_radrd_;
+
 }
 
 /**

@@ -102,6 +102,16 @@ public:
    * @param meas_package The measurement at k+1
    */
   void UpdateRadar(MeasurementPackage meas_package);
+private:
+  ///* Laser measurement covariance matrix
+  Eigen::MatrixXd R_laser_;
+
+  ///* Radar measurement covariance matrix
+  Eigen::MatrixXd R_radar_;
+
+
+  void Initialize(MeasurementPackage &meas_package);
+
 };
 
 #endif /* UKF_H */
