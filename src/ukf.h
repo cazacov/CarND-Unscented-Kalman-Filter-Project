@@ -103,15 +103,26 @@ public:
    */
   void UpdateRadar(MeasurementPackage meas_package);
 private:
+
+  ///* Count of sigma points
+  int points_count_;
+
   ///* Laser measurement covariance matrix
   Eigen::MatrixXd R_laser_;
 
   ///* Radar measurement covariance matrix
   Eigen::MatrixXd R_radar_;
 
+  ///* Process noise covariance matrix
+  Eigen::MatrixXd Q_;
+
 
   void Initialize(MeasurementPackage &meas_package);
+  void GenerateSigmaPoints(MatrixXd &Xsig);
 
+  void SigmaPointPrediction(MatrixXd &points, MatrixXd *Xsig_out, double delta_t);
+
+  void PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out);
 };
 
 #endif /* UKF_H */
