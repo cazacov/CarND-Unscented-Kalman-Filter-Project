@@ -57,7 +57,7 @@ UKF::UKF() {
   points_count_ = n_aug_ * 2 + 1;
 
   // Sigma point spreading parameter
-  lambda_ = 3.0 - n_x_;
+  lambda_ = 3.0 - n_aug_;
 
   is_initialized_ = false;
 }
@@ -170,7 +170,7 @@ void UKF::Initialize(MeasurementPackage &meas_package)
 void UKF::Prediction(double delta_t) {
 
   // generate sigma points
-  MatrixXd Xsig = MatrixXd(n_x_, points_count_);
+  MatrixXd Xsig = MatrixXd(n_aug_, points_count_);
   GenerateSigmaPoints(Xsig);
 
   // predict sigma points
@@ -189,7 +189,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   // Map predicted sigma points to lidar measurement space
 
   // Lidar has 2 coordinates
-  int n_z = 3;
+  int n_z = 2;
 
   //create matrix for sigma points in measurement space
   MatrixXd Zsig = MatrixXd(n_z, points_count_);
@@ -342,7 +342,9 @@ void UKF::GenerateSigmaPoints(MatrixXd &Xsig)
 
   //create square root matrix
   MatrixXd A = P_aug.llt().matrixL();
-  MatrixXd t = sqrt((lambda_ + n_aug_)) * A;
+  double scale = sqrt((lambda_ + n_aug_));
+
+  MatrixXd t =  scale * A;
 
   Xsig.col(0) = x_aug;
   Xsig.block(0,1, n_aug_, n_aug_) = t.colwise() + x_aug;
