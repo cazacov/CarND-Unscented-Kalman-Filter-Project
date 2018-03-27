@@ -54,7 +54,7 @@ UKF::UKF() {
   n_aug_ = n_x_ + 2;
 
   // Sigma points count
-  points_count_ = n_x_ * 2 + 1;
+  points_count_ = n_aug_ * 2 + 1;
 
   // Sigma point spreading parameter
   lambda_ = 3.0 - n_x_;
@@ -149,6 +149,7 @@ void UKF::Initialize(MeasurementPackage &meas_package)
               0, std_laspy_ * std_laspy_;
 
   //measurement covariance matrix - radar
+  R_radar_ = MatrixXd(3,3);
   R_radar_ << std_radr_ * std_radr_, 0, 0,
           0, std_radphi_ * std_radphi_, 0,
           0, 0, std_radrd_ * std_radrd_;
@@ -185,14 +186,66 @@ void UKF::Prediction(double delta_t) {
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
-  /**
-  TODO:
+  // Map predicted sigma points to lidar measurement space
 
-  Complete this function! Use lidar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
+  // Lidar has 2 coordinates
+  int n_z = 3;
 
-  You'll also need to calculate the lidar NIS.
-  */
+  //create matrix for sigma points in measurement space
+  MatrixXd Zsig = MatrixXd(n_z, points_count_);
+
+  //mean predicted measurement
+  VectorXd z_pred = VectorXd(n_z);
+
+  for (int i = 0; i < points_count_; i++)
+  {
+    double px = Xsig_pred_(0,i);
+    double py = Xsig_pred_(1,i);
+
+    Zsig(0,i) = px;
+    Zsig(1,i) = py;
+  }
+
+  //calculate mean predicted measurement
+
+  z_pred = VectorXd::Zero(n_z);
+  for (int i = 0; i < points_count_; i++)
+  {
+    z_pred = z_pred + weights_(i) * Zsig.col(i);
+  }
+
+
+  //measurement covariance matrix S
+
+  MatrixXd S = MatrixXd(n_z, n_z);
+  for (int i = 0; i < points_count_; i++)
+  {
+    VectorXd t = Zsig.col(i) - z_pred;
+    S += weights_(i) * t * t.transpose();
+  }
+
+  // Add lidar measurement noise
+  S += R_laser_;
+
+
+  // Update state
+
+  // Create matrix for cross correlation between sigma points in  state space and measurement space
+
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
+  for (int i = 0; i < points_count_; i++)
+  {
+    Tc = Tc + weights_(i) * ((Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose());
+  }
+
+  //calculate Kalman gain K;
+  MatrixXd kalman_gain = Tc * S.inverse();
+
+  //update state mean and covariance matrix
+  x_ = x_ + kalman_gain * (meas_package.raw_measurements_ - z_pred);
+
+  P_ = P_ - kalman_gain * S * kalman_gain.transpose();
 }
 
 /**
