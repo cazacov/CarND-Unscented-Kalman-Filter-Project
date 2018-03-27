@@ -119,10 +119,8 @@ private:
 
   void Initialize(MeasurementPackage &meas_package);
   void GenerateSigmaPoints(MatrixXd &Xsig);
-
-  void SigmaPointPrediction(MatrixXd &points, MatrixXd *Xsig_out, double delta_t);
-
-  void PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out);
+  void SigmaPointPrediction(MatrixXd &XSig, double delta_t);
+  void PredictMeanAndCovariance();
 
   void UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &z, int n_z);
 };

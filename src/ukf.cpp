@@ -174,10 +174,10 @@ void UKF::Prediction(double delta_t) {
   GenerateSigmaPoints(Xsig);
 
   // predict sigma points
-  SigmaPointPrediction(Xsig, &Xsig_pred_, delta_t);
+  SigmaPointPrediction(Xsig, delta_t);
 
   // predict state and state covariance
-  PredictMeanAndCovariance(&x_, &P_);
+  PredictMeanAndCovariance();
 }
 
 /**
@@ -314,21 +314,21 @@ void UKF::GenerateSigmaPoints(MatrixXd &Xsig)
 
 }
 
-void UKF::SigmaPointPrediction(MatrixXd &points, MatrixXd *Xsig_out, double delta_t) {
+void UKF::SigmaPointPrediction(MatrixXd &XSig, double delta_t) {
 
   MatrixXd predictions = MatrixXd(n_x_, points_count_);
 
   for (int i=0; i< points_count_; i++)
   {
-    double v = points(2, i);
-    double psi = points(3, i);
-    double psi_dot = points(4, i);
-    double n_a = points(5, i);
-    double n_psi_dot = points(6, i);
+    double v = XSig(2, i);
+    double psi = XSig(3, i);
+    double psi_dot = XSig(4, i);
+    double n_a = XSig(5, i);
+    double n_psi_dot = XSig(6, i);
 
     //predict sigma points
-    VectorXd inc = VectorXd(5);
-    VectorXd inc2 = VectorXd(5);
+    VectorXd inc = VectorXd(n_x_);
+    VectorXd inc2 = VectorXd(n_x_);
 
     //avoid division by zero
     if(fabs(psi_dot) < 1E-6)
@@ -356,15 +356,15 @@ void UKF::SigmaPointPrediction(MatrixXd &points, MatrixXd *Xsig_out, double delt
 
 
     //write predicted sigma points into right column
-    predictions.col(i) = points.col(i).head(n_x_) + inc + inc2;
+    predictions.col(i) = XSig.col(i).head(n_x_) + inc + inc2;
 
   }
 
-  *Xsig_out = predictions;
+  Xsig_pred_ = predictions;
 
 }
 
-void UKF::PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out) {
+void UKF::PredictMeanAndCovariance() {
 
   //create vector for weights
   weights_ = VectorXd(points_count_);
@@ -405,25 +405,37 @@ void UKF::PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out) {
   }
 
   // write result
-  *x_out = x;
-  *p_out = P;
+  x_ = x;
+  P_ = P;
 }
 
 void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &z, int n_z) {
+
+
   // Create matrix for cross correlation between sigma points in state space and measurement space
 
   //calculate cross correlation matrix
   MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
+
   for (int i = 0; i < points_count_; i++)
   {
-    Tc = Tc + weights_(i) * ((Xsig_pred_.col(i) - x_) * (z_sig.col(i) - z_pred).transpose());
+    //residual
+    VectorXd z_diff = z_sig.col(i) - z_pred;
+
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
+
+  //residual
+  VectorXd z_diff = z - z_pred;
 
   //calculate Kalman gain K;
   MatrixXd kalman_gain = Tc * s.inverse();
 
   //update state mean and covariance matrix
-  x_ = x_ + kalman_gain * (z - z_pred);
+  x_ = x_ + kalman_gain * z_diff;
 
   P_ = P_ - kalman_gain * s * kalman_gain.transpose();
 }
