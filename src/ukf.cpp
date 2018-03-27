@@ -13,7 +13,7 @@ using std::vector;
  */
 UKF::UKF() {
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = true;
+  use_laser_ = false;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
@@ -227,25 +227,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   // Add lidar measurement noise
   S += R_laser_;
 
-
-  // Update state
-
-  // Create matrix for cross correlation between sigma points in  state space and measurement space
-
-  //calculate cross correlation matrix
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
-  for (int i = 0; i < points_count_; i++)
-  {
-    Tc = Tc + weights_(i) * ((Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose());
-  }
-
-  //calculate Kalman gain K;
-  MatrixXd kalman_gain = Tc * S.inverse();
-
-  //update state mean and covariance matrix
-  x_ = x_ + kalman_gain * (meas_package.raw_measurements_ - z_pred);
-
-  P_ = P_ - kalman_gain * S * kalman_gain.transpose();
+  UpdateState(Zsig, S, z_pred, meas_package.raw_measurements_, n_z);
 }
 
 /**
@@ -293,7 +275,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     z_pred = z_pred + weights_(i) * Zsig.col(i);
   }
 
-
   //measurement covariance matrix S
 
   MatrixXd S = MatrixXd(n_z, n_z);
@@ -306,26 +287,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   // Add radar measurement noise
   S += R_radar_;
 
-
-  // Update state
-
-  // Create matrix for cross correlation between sigma points in  state space and measurement space
-
-  //calculate cross correlation matrix
-  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
-  for (int i = 0; i < points_count_; i++)
-  {
-    Tc = Tc + weights_(i) * ((Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose());
-  }
-
-  //calculate Kalman gain K;
-  MatrixXd kalman_gain = Tc * S.inverse();
-
-  //update state mean and covariance matrix
-  x_ = x_ + kalman_gain * (meas_package.raw_measurements_ - z_pred);
-
-  P_ = P_ - kalman_gain * S * kalman_gain.transpose();
-
+  UpdateState(Zsig, S, z_pred, meas_package.raw_measurements_, n_z);
 }
 
 void UKF::GenerateSigmaPoints(MatrixXd &Xsig)
@@ -445,4 +407,23 @@ void UKF::PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out) {
   // write result
   *x_out = x;
   *p_out = P;
+}
+
+void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &z, int n_z) {
+  // Create matrix for cross correlation between sigma points in state space and measurement space
+
+  //calculate cross correlation matrix
+  MatrixXd Tc = MatrixXd::Zero(n_x_, n_z);
+  for (int i = 0; i < points_count_; i++)
+  {
+    Tc = Tc + weights_(i) * ((Xsig_pred_.col(i) - x_) * (z_sig.col(i) - z_pred).transpose());
+  }
+
+  //calculate Kalman gain K;
+  MatrixXd kalman_gain = Tc * s.inverse();
+
+  //update state mean and covariance matrix
+  x_ = x_ + kalman_gain * (z - z_pred);
+
+  P_ = P_ - kalman_gain * s * kalman_gain.transpose();
 }

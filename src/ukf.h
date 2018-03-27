@@ -123,6 +123,8 @@ private:
   void SigmaPointPrediction(MatrixXd &points, MatrixXd *Xsig_out, double delta_t);
 
   void PredictMeanAndCovariance(VectorXd* x_out, MatrixXd* p_out);
+
+  void UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &z, int n_z);
 };
 
 #endif /* UKF_H */
