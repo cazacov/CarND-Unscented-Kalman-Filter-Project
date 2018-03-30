@@ -123,6 +123,8 @@ private:
   void PredictMeanAndCovariance();
 
   void UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &z, int n_z);
+
+  double NormalizeAngle(double a);
 };
 
 #endif /* UKF_H */

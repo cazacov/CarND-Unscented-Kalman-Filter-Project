@@ -12,17 +12,21 @@ using std::vector;
  * This is scaffolding, do not modify
  */
 UKF::UKF() {
+
+  // State dimension
+  n_x_ = 5;
+
   // if this is false, laser measurements will be ignored (except during init)
-  use_laser_ = false;
+  use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
   use_radar_ = true;
 
   // initial state vector
-  x_ = VectorXd(5);
+  x_ = VectorXd(n_x_);
 
   // initial covariance matrix
-  P_ = MatrixXd(5, 5);
+  P_ = MatrixXd(n_x_, n_x_);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
   std_a_ = 10;
@@ -46,9 +50,6 @@ UKF::UKF() {
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
   //DO NOT MODIFY measurement noise values above these are provided by the sensor manufacturer.
-
-  // State dimension
-  n_x_ = 5;
 
   // Augmented state dimension
   n_aug_ = n_x_ + 2;
@@ -77,11 +78,10 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     return;
   }
 
-  float dt = (meas_package.timestamp_ - time_us_) / 1000000.0;  //dt - expressed in seconds
+  float delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;  //delta_t - expressed in seconds
   time_us_= meas_package.timestamp_;
 
-
-  Prediction(dt);
+  Prediction(delta_t);
 
   switch (meas_package.sensor_type_){
     case MeasurementPackage::LASER:
@@ -101,8 +101,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   }
 
   // print the output
-  cout << "x_ = " << x_ << endl;
-  cout << "P_ = " << P_ << endl;
+  cout << "new x_ " << endl << x_ << endl;
+  cout << "new P_ " << endl << P_ << endl << endl << endl;
 
 }
 
@@ -139,9 +139,9 @@ void UKF::Initialize(MeasurementPackage &meas_package)
   P_ = MatrixXd(n_x_, n_x_);
   P_ << 1,  0,  0,  0,  0,
         0,  1,  0,  0,  0,
-        0,  0,  1000, 0, 0,
-        0,  0,  0,  1000, 0,
-        0,  0,  0,  0,  1000;
+        0,  0,  5 * 5,  0, 0,             // 5 m/s = 18 kmh is a reasonable estimation of bycicle speed
+        0,  0,  0,  M_PI * M_PI, 0,       // PI is our max. uncertainty in initial bycicle direction
+        0,  0,  0,  0,  1 * 1;            // 1 radian / second is turn speed estimation
 
   // measurement covariance matrix - laser
   R_laser_ = MatrixXd(2,2);
@@ -157,7 +157,7 @@ void UKF::Initialize(MeasurementPackage &meas_package)
   // process noise covariance matrix
   Q_ = MatrixXd(2,2);
   Q_ << std_a_ * std_a_, 0,
-        0,  std_yawdd_;
+        0,  std_yawdd_ * std_yawdd_;
 
 
 }
@@ -178,6 +178,7 @@ void UKF::Prediction(double delta_t) {
 
   // predict state and state covariance
   PredictMeanAndCovariance();
+
 }
 
 /**
@@ -217,7 +218,7 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   //measurement covariance matrix S
 
-  MatrixXd S = MatrixXd(n_z, n_z);
+  MatrixXd S = MatrixXd::Zero(n_z, n_z);
   for (int i = 0; i < points_count_; i++)
   {
     VectorXd t = Zsig.col(i) - z_pred;
@@ -277,7 +278,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   //measurement covariance matrix S
 
-  MatrixXd S = MatrixXd(n_z, n_z);
+  MatrixXd S = MatrixXd::Zero(n_z, n_z);
   for (int i = 0; i < points_count_; i++)
   {
     VectorXd t = Zsig.col(i) - z_pred;
@@ -294,17 +295,18 @@ void UKF::GenerateSigmaPoints(MatrixXd &Xsig)
 {
 
   //create augmented mean vector
-  VectorXd x_aug = VectorXd(n_aug_);
+  VectorXd x_aug = VectorXd::Zero(n_aug_);
   x_aug.head(n_x_) = x_;
 
+
   //create augmented state covariance
-  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
+  MatrixXd P_aug = MatrixXd::Zero(n_aug_, n_aug_);
   P_aug.block(0,0,n_x_,n_x_) = P_;
   P_aug.block(n_x_,n_x_,2,2) = Q_;
 
   //create square root matrix
   MatrixXd A = P_aug.llt().matrixL();
-  double scale = sqrt((lambda_ + n_aug_));
+  double scale = sqrt(lambda_ + n_aug_);
 
   MatrixXd t =  scale * A;
 
@@ -331,7 +333,7 @@ void UKF::SigmaPointPrediction(MatrixXd &XSig, double delta_t) {
     VectorXd inc2 = VectorXd(n_x_);
 
     //avoid division by zero
-    if(fabs(psi_dot) < 1E-6)
+    if(fabs(psi_dot) < 1E-3)
     {
       inc(0) = v * cos(psi) * delta_t;
       inc(1) = v * sin(psi) * delta_t;
@@ -399,6 +401,8 @@ void UKF::PredictMeanAndCovariance() {
   for (int i = 0; i < points_count_; i++)
   {
     VectorXd t =  Xsig_pred_.col(i) - x;
+    t(3) = NormalizeAngle(t(3));
+
     MatrixXd tt = t.transpose();
 
     P = P + weights_(i) * t * tt;
@@ -424,6 +428,7 @@ void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    x_diff(3) =  NormalizeAngle(x_diff(3));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -438,4 +443,10 @@ void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &
   x_ = x_ + kalman_gain * z_diff;
 
   P_ = P_ - kalman_gain * s * kalman_gain.transpose();
+}
+
+double UKF::NormalizeAngle(double a)
+{
+  while (a > M_PI) a-= 2*M_PI;
+  while (a < -M_PI) a+= 2*M_PI;
 }
