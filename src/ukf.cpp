@@ -29,10 +29,10 @@ UKF::UKF() {
   P_ = MatrixXd(n_x_, n_x_);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 10;
+  std_a_ = 5;   // Half of gravitational acceleration is a reasonable estimation of max. possible acceleration one can reach with muscle force
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 1;
+  std_yawdd_ = 1;   // That's about 57 degrees / sec2.
   
   //DO NOT MODIFY measurement noise values below these are provided by the sensor manufacturer.
   // Laser measurement noise standard deviation position1 in m
@@ -427,6 +427,7 @@ void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
     x_diff(3) = NormalizeAngle(x_diff(3));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
@@ -444,6 +445,9 @@ void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &
   P_ = P_ - kalman_gain * s * kalman_gain.transpose();
 }
 
+/**
+ * Maps input angle in range -PI..+PI
+ */
 double UKF::NormalizeAngle(double a)
 {
   while (a > M_PI) a-= 2*M_PI;
