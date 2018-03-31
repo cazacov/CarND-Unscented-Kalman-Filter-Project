@@ -139,8 +139,8 @@ void UKF::Initialize(MeasurementPackage &meas_package)
   P_ = MatrixXd(n_x_, n_x_);
   P_ << 1,  0,  0,  0,  0,
         0,  1,  0,  0,  0,
-        0,  0,  5 * 5,  0, 0,             // 5 m/s = 18 kmh is a reasonable estimation of bycicle speed
-        0,  0,  0,  M_PI * M_PI, 0,       // PI is our max. uncertainty in initial bycicle direction
+        0,  0,  5 * 5,  0, 0,             // 5 m/s = 18 kmh is a reasonable estimation of bicycle speed
+        0,  0,  0,  M_PI * M_PI, 0,       // PI is our max. uncertainty in initial bicycle direction
         0,  0,  0,  0,  1 * 1;            // 1 radian / second is turn speed estimation
 
   // measurement covariance matrix - laser
@@ -298,7 +298,6 @@ void UKF::GenerateSigmaPoints(MatrixXd &Xsig)
   VectorXd x_aug = VectorXd::Zero(n_aug_);
   x_aug.head(n_x_) = x_;
 
-
   //create augmented state covariance
   MatrixXd P_aug = MatrixXd::Zero(n_aug_, n_aug_);
   P_aug.block(0,0,n_x_,n_x_) = P_;
@@ -428,7 +427,7 @@ void UKF::UpdateState(MatrixXd &z_sig, MatrixXd &s, VectorXd &z_pred, VectorXd &
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    x_diff(3) =  NormalizeAngle(x_diff(3));
+    x_diff(3) = NormalizeAngle(x_diff(3));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -449,4 +448,5 @@ double UKF::NormalizeAngle(double a)
 {
   while (a > M_PI) a-= 2*M_PI;
   while (a < -M_PI) a+= 2*M_PI;
+  return a;
 }
